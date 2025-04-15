@@ -100,23 +100,27 @@ class VerificationViewController: UIViewController {
     
     @objc private func verifyButtonTapped() {
         guard let code = codeTextField.text, !code.isEmpty else {
-            // Show error
+            showError("Please enter the verification code")
             return
         }
         
         verifyButton.isEnabled = false
+        showLoading(true)
         
         AuthService.shared.verifyCode(code, for: phoneNumber) { [weak self] result in
             DispatchQueue.main.async {
                 self?.verifyButton.isEnabled = true
+                self?.showLoading(false)
                 
                 switch result {
                 case .success:
-                    // Navigate to main app
-                    print("Successfully verified!")
+                    // Get the SceneDelegate to switch to main interface
+                    if let sceneDelegate = UIApplication.shared.connectedScenes
+                        .first?.delegate as? SceneDelegate {
+                        sceneDelegate.showMainInterface()
+                    }
                 case .failure(let error):
-                    // Show error alert
-                    print(error.message)
+                    self?.showError(error.message)
                 }
             }
         }
@@ -131,13 +135,44 @@ class VerificationViewController: UIViewController {
                 
                 switch result {
                 case .success:
-                    // Show success message
-                    print("Code resent!")
+                    self?.showSuccess("Code resent successfully")
                 case .failure(let error):
-                    // Show error alert
-                    print(error.message)
+                    self?.showError(error.message)
                 }
             }
+        }
+    }
+    
+    private func showError(_ message: String) {
+        let alert = UIAlertController(
+            title: "Error",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showSuccess(_ message: String) {
+        let alert = UIAlertController(
+            title: "Success",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
+    private func showLoading(_ show: Bool) {
+        if show {
+            let activityIndicator = UIActivityIndicatorView(style: .medium)
+            activityIndicator.startAnimating()
+            verifyButton.setTitle("", for: .normal)
+            verifyButton.addSubview(activityIndicator)
+            activityIndicator.center = CGPoint(x: verifyButton.bounds.width/2, y: verifyButton.bounds.height/2)
+        } else {
+            verifyButton.subviews.forEach { $0.removeFromSuperview() }
+            verifyButton.setTitle("Verify", for: .normal)
         }
     }
 } 

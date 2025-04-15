@@ -1,0 +1,135 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Ahura Restaurant Reservation Backend
+
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues:
+      - dev
+      - prod
+    Description: Environment name
+
+Resources:
+  # API Gateway
+  ResyAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: !Ref Environment
+      Auth:
+        DefaultAuthorizer: CognitoAuthorizer
+        Authorizers:
+          CognitoAuthorizer:
+            UserPoolArn: !GetAtt UserPool.Arn
+
+  # Lambda Function
+  ResyFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: lambda/resy-api
+      Handler: index.handler
+      Runtime: nodejs16.x
+      Timeout: 30
+      MemorySize: 256
+      Environment:
+        Variables:
+          RESY_API_KEY: !Sub '{{resolve:secretsmanager:${ResyAPICredentials}:SecretString:apiKey}}'
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReservationsTable
+        - SecretsManagerReadWrite:
+            SecretArn: !Ref ResyAPICredentials
+      Events:
+        SearchVenues:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ResyAPI
+            Path: /venues/search
+            Method: POST
+        GetVenue:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ResyAPI
+            Path: /venues/{id}
+            Method: GET
+        BookReservation:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ResyAPI
+            Path: /reservations/book
+            Method: POST
+
+  # DynamoDB Table
+  ReservationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: !Sub 'Reservations-${Environment}'
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: userId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: UserReservations
+          KeySchema:
+            - AttributeName: userId
+              KeyType: HASH
+          Projection:
+            ProjectionType: ALL
+          ProvisionedThroughput:
+            ReadCapacityUnits: 5
+            WriteCapacityUnits: 5
+      ProvisionedThroughput:
+        ReadCapacityUnits: 5
+        WriteCapacityUnits: 5
+
+  # Cognito User Pool
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: !Sub 'AhuraUsers-${Environment}'
+      AutoVerifiedAttributes:
+        - phone_number
+      UsernameAttributes:
+        - phone_number
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+
+  # Cognito User Pool Client
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: !Sub 'AhuraApp-${Environment}'
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
+  # Secrets Manager for Resy API Credentials
+  ResyAPICredentials:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Name: !Sub 'resy/api-credentials-${Environment}'
+      Description: Resy API Credentials
+      SecretString: '{"apiKey":"","authToken":""}'
+
+Outputs:
+  ApiEndpoint:
+    Description: API Gateway endpoint URL
+    Value: !Sub 'https://${ResyAPI}.execute-api.${AWS::Region}.amazonaws.com/${Environment}'
+  UserPoolId:
+    Description: Cognito User Pool ID
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: Cognito User Pool Client ID
+    Value: !Ref UserPoolClient 

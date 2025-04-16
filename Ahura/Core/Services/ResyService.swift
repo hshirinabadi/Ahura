@@ -45,18 +45,9 @@ class ResyService: ResyServiceProtocol {
         
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
-        
-//        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-//        request.setValue("application/json, text/plain, */*", forHTTPHeaderField: "Accept")
-//        request.setValue("https://resy.com", forHTTPHeaderField: "Origin")
-//        request.setValue("https://resy.com/", forHTTPHeaderField: "Referer")
-//        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
-//        request.setValue("https://resy.com", forHTTPHeaderField: "x-origin")
-//        request.setValue("ResyAPI api_key=\"VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5\"", forHTTPHeaderField: "Authorization")
-        
         request.allHTTPHeaderFields = headers()
         
-        let deviceToken = UUID().uuidString
+        let deviceToken = generateDeviceToken()
         let params: [String: String] = [
             "mobile_number": phoneNumber,
             "method": "sms",
@@ -108,7 +99,7 @@ class ResyService: ResyServiceProtocol {
     }
     
     func verifyCode(_ code: String, for phoneNumber: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/auth/phone/verify") else {
+        guard let url = URL(string: "\(baseURL)/auth/verification/by_code") else {
             completion(.failure(.invalidRequest))
             return
         }
@@ -117,7 +108,6 @@ class ResyService: ResyServiceProtocol {
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = headers()
         
-        // Phone number is already formatted by AuthService
         let body: [String: Any] = [
             "phone_number": phoneNumber,
             "code": code,
@@ -163,16 +153,6 @@ class ResyService: ResyServiceProtocol {
                 completion(.failure(.invalidResponse))
             }
         }.resume()
-    }
-    
-    private func makeFormURLEncodedBody(from params: [String: String]) -> String {
-        params.map { key, value in
-            let encodedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            let encodedValue = value
-//                .replacingOccurrences(of: "+", with: "%2B") // fix '+' handling
-                .addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
-            return "\(encodedKey)=\(encodedValue)"
-        }.joined(separator: "&")
     }
     
     func searchVenues(request: ResySearchRequest, completion: @escaping (Result<ResySearchResponse, AppError>) -> Void) {

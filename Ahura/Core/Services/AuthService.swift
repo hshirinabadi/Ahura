@@ -48,12 +48,11 @@ class AuthService: AuthServiceProtocol {
         ResyService.shared.verifyCode(code, for: formattedNumber) { result in
             switch result {
             case .success(let response):
-                // Store the auth token
                 self.userDefaults.set(response.token, forKey: self.authTokenKey)
                 self.userDefaults.set(formattedNumber, forKey: self.userPhoneKey)
                 completion(.success(response))
-            case .failure:
-                completion(.failure(.invalidCode))
+            case .failure(let error):
+                completion(.failure(error))
             }
         }
     }

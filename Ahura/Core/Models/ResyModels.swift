@@ -3,13 +3,13 @@ import Foundation
 // MARK: - Auth Models
 struct ResyAuthResponse: Codable {
     let token: String
-    let userId: String
-    let expiresAt: String
+    let userId: Int
+    let expiresAt: Int
     
     enum CodingKeys: String, CodingKey {
-        case token = "auth_token"
-        case userId = "user_id"
-        case expiresAt = "expires_at"
+        case token = "token"
+        case userId = "id"
+        case expiresAt = "date_updated"
     }
 }
     
@@ -84,4 +84,46 @@ struct ResyBookingRequest: Codable {
         case partySize = "party_size"
         case day, time
     }
+}
+
+struct ResyChallengeResponse: Codable {
+    let mobileClaim: MobileClaim
+    let challenge: Challenge
+    
+    enum CodingKeys: String, CodingKey {
+        case mobileClaim = "mobile_claim"
+        case challenge
+    }
+}
+
+struct MobileClaim: Codable {
+    let mobileNumber: String
+    let claimToken: String
+    let dateExpires: String
+    
+    enum CodingKeys: String, CodingKey {
+        case mobileNumber = "mobile_number"
+        case claimToken = "claim_token"
+        case dateExpires = "date_expires"
+    }
+}
+
+struct Challenge: Codable {
+    let challengeId: String
+    let firstName: String
+    let message: String
+    let properties: [ChallengeProperty]
+    
+    enum CodingKeys: String, CodingKey {
+        case challengeId = "challenge_id"
+        case firstName = "first_name"
+        case message
+        case properties
+    }
+}
+
+struct ChallengeProperty: Codable {
+    let name: String
+    let type: String
+    let message: String
 } 

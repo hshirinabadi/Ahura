@@ -20,6 +20,8 @@ enum AppError: Error {
     // General Errors
     case unknown
     
+    case challengeRequired(ResyChallengeResponse)
+    
     var message: String {
         switch self {
         // Auth Errors
@@ -51,6 +53,9 @@ enum AppError: Error {
         // General Errors
         case .unknown:
             return "An unknown error occurred"
+            
+        case .challengeRequired:
+            return "Additional verification required. Please enter your email address."
         }
     }
 } 

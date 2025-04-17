@@ -3,6 +3,7 @@ import Foundation
 protocol ResyServiceProtocol {
     func sendVerificationCode(to phoneNumber: String, completion: @escaping (Result<Void, AppError>) -> Void)
     func verifyCode(_ code: String, for phoneNumber: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void)
+    func completeChallenge(challengeId: String, email: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void)
     func searchVenues(request: ResySearchRequest, completion: @escaping (Result<ResySearchResponse, AppError>) -> Void)
     func getVenueDetails(id: Int, completion: @escaping (Result<ResyVenue, AppError>) -> Void)
     func bookReservation(request: ResyBookingRequest, completion: @escaping (Result<Bool, AppError>) -> Void)
@@ -13,6 +14,7 @@ class ResyService: ResyServiceProtocol {
     
     private let baseURL = "https://api.resy.com/3"
     private let apiKey = "VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"
+    private var deviceToken: String = ""
     
     private init() {}
     
@@ -47,7 +49,7 @@ class ResyService: ResyServiceProtocol {
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = headers()
         
-        let deviceToken = generateDeviceToken()
+        deviceToken = generateDeviceToken()
         let params: [String: String] = [
             "mobile_number": phoneNumber,
             "method": "sms",
@@ -99,7 +101,7 @@ class ResyService: ResyServiceProtocol {
     }
     
     func verifyCode(_ code: String, for phoneNumber: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void) {
-        guard let url = URL(string: "\(baseURL)/auth/verification/by_code") else {
+        guard let url = URL(string: "\(baseURL)/auth/mobile") else {
             completion(.failure(.invalidRequest))
             return
         }
@@ -108,23 +110,78 @@ class ResyService: ResyServiceProtocol {
         request.httpMethod = "POST"
         request.allHTTPHeaderFields = headers()
         
-        let body: [String: Any] = [
-            "phone_number": phoneNumber,
+        let params: [String: String] = [
+            "mobile_number": phoneNumber,
             "code": code,
-            "locale": "en-us",
-            "device_type": "ios"
+            "device_type_id": "3",
+            "device_token": deviceToken
         ]
+        let encodedParams = params.asFormURLEncoded()
+        request.httpBody = encodedParams.data(using: .utf8)
         
-        do {
-            request.httpBody = try JSONSerialization.data(withJSONObject: body)
-        } catch {
+        print("Sending verification request to: \(url)")
+        print("Headers: \(headers())")
+        print("Body: \(encodedParams)")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("Network error: \(error)")
+                completion(.failure(.networkError))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(.failure(.networkError))
+                return
+            }
+            
+            if let data = data {
+                print("Response status: \(httpResponse.statusCode)")
+                print("Response data: \(String(data: data, encoding: .utf8) ?? "No data")")
+                
+                do {
+                    // First try to decode as a challenge response
+                    if let challengeResponse = try? JSONDecoder().decode(ResyChallengeResponse.self, from: data) {
+                        // If we get a challenge, we need to complete it
+                        completion(.failure(.challengeRequired(challengeResponse)))
+                        return
+                    }
+                    
+                    // If not a challenge, try to decode as auth response
+                    let response = try JSONDecoder().decode(ResyAuthResponse.self, from: data)
+                    completion(.success(response))
+                } catch {
+                    print("Decoding error: \(error)")
+                    completion(.failure(.invalidResponse))
+                }
+            } else {
+                completion(.failure(.invalidResponse))
+            }
+        }.resume()
+    }
+    
+    func completeChallenge(challengeId: String, email: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void) {
+        guard let url = URL(string: "\(baseURL)/auth/challenge") else {
             completion(.failure(.invalidRequest))
             return
         }
         
-        print("Sending verification request to: \(url)")
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.allHTTPHeaderFields = headers()
+        
+        let params: [String: String] = [
+            "challenge_id": challengeId,
+            "em_address": email,
+            "device_token": deviceToken,
+            "device_type_id": "3"
+        ]
+        let encodedParams = params.asFormURLEncoded()
+        request.httpBody = encodedParams.data(using: .utf8)
+        
+        print("Completing challenge request to: \(url)")
         print("Headers: \(headers())")
-        print("Body: \(body)")
+        print("Body: \(encodedParams)")
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {

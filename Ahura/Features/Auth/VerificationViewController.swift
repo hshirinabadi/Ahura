@@ -30,7 +30,7 @@ class VerificationViewController: UIViewController {
     
     private let codeTextField: UITextField = {
         let textField = UITextField()
-        textField.placeholder = "Enter 4-digit code"
+        textField.placeholder = "Enter 6-digit code"
         textField.keyboardType = .numberPad
         textField.borderStyle = .roundedRect
         textField.textAlignment = .center
@@ -120,7 +120,13 @@ class VerificationViewController: UIViewController {
                         sceneDelegate.showMainInterface()
                     }
                 case .failure(let error):
-                    self?.showError(error.message)
+                    switch error {
+                    case .challengeRequired(let challengeResponse):
+                        self?.currentChallenge = challengeResponse
+                        self?.showChallengeViewController(challenge: challengeResponse.challenge)
+                    default:
+                        self?.showError(error.message)
+                    }
                 }
             }
         }
@@ -173,6 +179,52 @@ class VerificationViewController: UIViewController {
         } else {
             verifyButton.subviews.forEach { $0.removeFromSuperview() }
             verifyButton.setTitle("Verify", for: .normal)
+        }
+    }
+    
+    private func showChallengeViewController(challenge: Challenge) {
+        let challengeVC = ChallengeViewController(challenge: challenge)
+        challengeVC.delegate = self
+        challengeVC.modalPresentationStyle = .fullScreen
+        present(challengeVC, animated: true)
+    }
+    
+    private var currentChallenge: ResyChallengeResponse?
+}
+
+extension VerificationViewController: ChallengeViewControllerDelegate {
+    func challengeViewController(_ controller: ChallengeViewController, didSubmitEmail email: String) {
+        guard let challengeResponse = currentChallenge else {
+            controller.dismiss(animated: true)
+            return
+        }
+        
+        print("📧 Submitting email for challenge: \(challengeResponse.challenge.challengeId)")
+        print("📧 Email: \(email)")
+        
+        ResyService.shared.completeChallenge(challengeId: challengeResponse.challenge.challengeId, email: email) { [weak self] result in
+            DispatchQueue.main.async {
+                print("📥 Challenge completion response received")
+                
+                switch result {
+                case .success(let response):
+                    print("✅ Challenge completed successfully")
+                    print("🔑 Received token: \(response.token)")
+                    controller.dismiss(animated: true) {
+                        // Get the SceneDelegate to switch to main interface
+                        if let sceneDelegate = UIApplication.shared.connectedScenes
+                            .first?.delegate as? SceneDelegate {
+                            sceneDelegate.showMainInterface()
+                        }
+                    }
+                    
+                case .failure(let error):
+                    print("❌ Challenge completion failed: \(error)")
+                    controller.dismiss(animated: true) {
+                        self?.showError(error.message)
+                    }
+                }
+            }
         }
     }
 } 

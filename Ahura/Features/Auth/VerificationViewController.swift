@@ -202,7 +202,7 @@ extension VerificationViewController: ChallengeViewControllerDelegate {
         print("📧 Submitting email for challenge: \(challengeResponse.challenge.challengeId)")
         print("📧 Email: \(email)")
         
-        ResyService.shared.completeChallenge(challengeId: challengeResponse.challenge.challengeId, email: email) { [weak self] result in
+        AuthService.shared.completeChallenge(challengeId: challengeResponse.challenge.challengeId, email: email) { [weak self] result in
             DispatchQueue.main.async {
                 print("📥 Challenge completion response received")
                 

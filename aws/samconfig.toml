@@ -1,0 +1,13 @@
+version = 0.1
+[default]
+[default.deploy]
+[default.deploy.parameters]
+stack_name = "Ahura"
+s3_bucket = "ahura-deployment-custom"
+s3_prefix = "Ahura"
+region = "us-east-2"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = false
+parameter_overrides = "Environment=dev"
+image_repositories = [] 

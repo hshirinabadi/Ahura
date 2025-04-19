@@ -11,14 +11,19 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         let window = UIWindow(windowScene: windowScene)
         
-        // For now, we'll start with the auth flow
-        // Later we'll check if user is already authenticated
-        let phoneNumberVC = PhoneNumberViewController()
-        let navigationController = UINavigationController(rootViewController: phoneNumberVC)
+        // Check if user is already authenticated
+        if AuthService.shared.isLoggedIn {
+            // User is logged in, show main interface
+            let mainTabBar = MainTabBarController()
+            window.rootViewController = mainTabBar
+        } else {
+            // User needs to log in
+            let phoneNumberVC = PhoneNumberViewController()
+            let navigationController = UINavigationController(rootViewController: phoneNumberVC)
+            window.rootViewController = navigationController
+        }
         
-        window.rootViewController = navigationController
         window.makeKeyAndVisible()
-        
         self.window = window
     }
     

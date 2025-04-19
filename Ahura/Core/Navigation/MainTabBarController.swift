@@ -53,14 +53,6 @@ class InstantBookViewController: UIViewController {
     }
 }
 
-class ReservationsViewController: UIViewController {
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        title = "Reservations"
-        view.backgroundColor = .appBackground
-    }
-}
-
 class AlertsViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()

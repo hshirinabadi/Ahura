@@ -3,6 +3,7 @@ import Foundation
 protocol AuthServiceProtocol {
     func sendVerificationCode(to phoneNumber: String, completion: @escaping (Result<Void, AppError>) -> Void)
     func verifyCode(_ code: String, for phoneNumber: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void)
+    func completeChallenge(challengeId: String, email: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void)
     var isLoggedIn: Bool { get }
     var authToken: String? { get }
 }
@@ -50,6 +51,18 @@ class AuthService: AuthServiceProtocol {
             case .success(let response):
                 self.userDefaults.set(response.token, forKey: self.authTokenKey)
                 self.userDefaults.set(formattedNumber, forKey: self.userPhoneKey)
+                completion(.success(response))
+            case .failure(let error):
+                completion(.failure(error))
+            }
+        }
+    }
+    
+    func completeChallenge(challengeId: String, email: String, completion: @escaping (Result<ResyAuthResponse, AppError>) -> Void) {
+        ResyService.shared.completeChallenge(challengeId: challengeId, email: email) { result in
+            switch result {
+            case .success(let response):
+                self.userDefaults.set(response.token, forKey: self.authTokenKey)
                 completion(.success(response))
             case .failure(let error):
                 completion(.failure(error))

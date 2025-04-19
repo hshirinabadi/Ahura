@@ -126,4 +126,38 @@ struct ChallengeProperty: Codable {
     let name: String
     let type: String
     let message: String
+}
+
+// MARK: - Reservation Models
+struct Reservation: Codable, Identifiable {
+    let id: String
+    let venueId: Int
+    let venueName: String
+    let date: String
+    let time: String
+    let partySize: Int
+    let status: ReservationStatus
+    let createdAt: String
+    
+    enum CodingKeys: String, CodingKey {
+        case id
+        case venueId = "venue_id"
+        case venueName = "venue_name"
+        case date
+        case time
+        case partySize = "party_size"
+        case status
+        case createdAt = "created_at"
+    }
+}
+
+enum ReservationStatus: String, Codable {
+    case confirmed
+    case pending
+    case cancelled
+    case completed
+}
+
+struct ReservationsResponse: Codable {
+    let reservations: [Reservation]
 } 

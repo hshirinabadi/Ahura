@@ -36,15 +36,15 @@ enum AppError: Error {
             
         // Network Errors
         case .networkError:
-            return "Network error occurred"
+            return "Network connection error. Please check your internet connection and try again."
         case .invalidRequest:
-            return "Invalid request"
+            return "Invalid request. Please try again."
         case .serverError:
-            return "Server error occurred"
+            return "Server error. Please try again later."
             
         // API Errors
         case .invalidResponse:
-            return "Invalid response from server"
+            return "Invalid response from server. Please try again."
         case .noAvailability:
             return "No availability for selected time"
         case .bookingFailed:
@@ -52,10 +52,15 @@ enum AppError: Error {
             
         // General Errors
         case .unknown:
-            return "An unknown error occurred"
+            return "An unknown error occurred. Please try again."
             
         case .challengeRequired:
             return "Additional verification required. Please enter your email address."
         }
     }
+}
+
+enum Result<Success, Failure: Error> {
+    case success(Success)
+    case failure(Failure)
 } 

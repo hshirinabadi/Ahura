@@ -7,6 +7,9 @@ protocol ResyServiceProtocol {
     func searchVenues(request: ResySearchRequest, completion: @escaping (Result<ResySearchResponse, AppError>) -> Void)
     func getVenueDetails(id: Int, completion: @escaping (Result<ResyVenue, AppError>) -> Void)
     func bookReservation(request: ResyBookingRequest, completion: @escaping (Result<Bool, AppError>) -> Void)
+    func getReservations(completion: @escaping (Result<ReservationsResponse, AppError>) -> Void)
+    func getPastReservations(completion: @escaping (Result<ReservationsResponse, AppError>) -> Void)
+    func getUpcomingReservations(completion: @escaping (Result<ReservationsResponse, AppError>) -> Void)
 }
 
 class ResyService: ResyServiceProtocol {
@@ -15,6 +18,8 @@ class ResyService: ResyServiceProtocol {
     private let baseURL = "https://api.resy.com/3"
     private let apiKey = "VbWk7s3L4KiK5fzlO7JD3Q5EYolJI7n5"
     private var deviceToken: String = ""
+    
+    private let awsBaseURL = "https://hrh6f7kaoh.execute-api.us-east-2.amazonaws.com/dev"
     
     private init() {}
     
@@ -32,6 +37,23 @@ class ResyService: ResyServiceProtocol {
             "User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X) AppleWebKit/605.1.15",
             "X-Origin": "https://resy.com"
         ]
+    }
+    
+    private func awsHeaders() -> [String: String] {
+        var headers = [
+            "Content-Type": "application/json",
+            "Accept": "application/json"
+        ]
+        
+        // Add Resy auth token if available
+        if let authToken = AuthService.shared.authToken {
+            headers["x-resy-auth-token"] = authToken
+            print("🔑 Using Resy auth token: \(authToken)")
+        } else {
+            print("⚠️ No Resy auth token available")
+        }
+        
+        return headers
     }
     
     func sendVerificationCode(to phoneNumber: String, completion: @escaping (Result<Void, AppError>) -> Void) {
@@ -223,4 +245,180 @@ class ResyService: ResyServiceProtocol {
     func bookReservation(request: ResyBookingRequest, completion: @escaping (Result<Bool, AppError>) -> Void) {
         
     }
+    
+    func getReservations(completion: @escaping (Result<ReservationsResponse, AppError>) -> Void) {
+        guard let url = URL(string: "\(awsBaseURL)/reservations") else {
+            print("❌ Invalid AWS URL: \(awsBaseURL)/reservations")
+            completion(.failure(.invalidRequest))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.allHTTPHeaderFields = awsHeaders()
+        
+        print("🌐 Fetching reservations from AWS: \(url)")
+        print("📋 Headers: \(awsHeaders())")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("❌ Network error: \(error.localizedDescription)")
+                completion(.failure(.networkError))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ Invalid response type")
+                completion(.failure(.networkError))
+                return
+            }
+            
+            print("📥 Response status code: \(httpResponse.statusCode)")
+            
+            if let data = data {
+                print("📦 Response data: \(String(data: data, encoding: .utf8) ?? "No data")")
+                
+                switch httpResponse.statusCode {
+                case 200:
+                    do {
+                        let response = try JSONDecoder().decode(ReservationsResponse.self, from: data)
+                        completion(.success(response))
+                    } catch {
+                        print("❌ Decoding error: \(error)")
+                        completion(.failure(.invalidResponse))
+                    }
+                case 401:
+                    print("❌ Unauthorized - Invalid or expired token")
+                    completion(.failure(.authenticationError))
+                default:
+                    if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                        print("❌ Server error: \(errorResponse.message)")
+                        completion(.failure(.serverError))
+                    } else {
+                        print("❌ Unexpected error")
+                        completion(.failure(.unknown))
+                    }
+                }
+            } else {
+                completion(.failure(.invalidResponse))
+            }
+        }.resume()
+    }
+    
+    func getPastReservations(completion: @escaping (Result<ReservationsResponse, AppError>) -> Void) {
+        guard let url = URL(string: "\(awsBaseURL)/reservations/past") else {
+            completion(.failure(.invalidRequest))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.allHTTPHeaderFields = awsHeaders()
+        
+        print("🌐 Fetching past reservations from: \(url)")
+        print("📋 Headers: \(awsHeaders())")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("❌ Network error: \(error)")
+                completion(.failure(.networkError))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(.failure(.networkError))
+                return
+            }
+            
+            if let data = data {
+                print("📥 Response status: \(httpResponse.statusCode)")
+                print("📦 Response data: \(String(data: data, encoding: .utf8) ?? "No data")")
+                
+                switch httpResponse.statusCode {
+                case 200:
+                    do {
+                        let response = try JSONDecoder().decode(ReservationsResponse.self, from: data)
+                        completion(.success(response))
+                    } catch {
+                        print("❌ Decoding error: \(error)")
+                        completion(.failure(.invalidResponse))
+                    }
+                case 401:
+                    print("❌ Unauthorized - Invalid or expired token")
+                    completion(.failure(.authenticationError))
+                default:
+                    if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                        print("❌ Server error: \(errorResponse.message)")
+                        completion(.failure(.serverError))
+                    } else {
+                        print("❌ Unexpected error")
+                        completion(.failure(.unknown))
+                    }
+                }
+            } else {
+                completion(.failure(.invalidResponse))
+            }
+        }.resume()
+    }
+    
+    func getUpcomingReservations(completion: @escaping (Result<ReservationsResponse, AppError>) -> Void) {
+        guard let url = URL(string: "\(awsBaseURL)/reservations/upcoming") else {
+            completion(.failure(.invalidRequest))
+            return
+        }
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.allHTTPHeaderFields = awsHeaders()
+        
+        print("🌐 Fetching upcoming reservations from: \(url)")
+        print("📋 Headers: \(awsHeaders())")
+        
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("❌ Network error: \(error)")
+                completion(.failure(.networkError))
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                completion(.failure(.networkError))
+                return
+            }
+            
+            if let data = data {
+                print("📥 Response status: \(httpResponse.statusCode)")
+                print("📦 Response data: \(String(data: data, encoding: .utf8) ?? "No data")")
+                
+                switch httpResponse.statusCode {
+                case 200:
+                    do {
+                        let response = try JSONDecoder().decode(ReservationsResponse.self, from: data)
+                        completion(.success(response))
+                    } catch {
+                        print("❌ Decoding error: \(error)")
+                        completion(.failure(.invalidResponse))
+                    }
+                case 401:
+                    print("❌ Unauthorized - Invalid or expired token")
+                    completion(.failure(.authenticationError))
+                default:
+                    if let errorResponse = try? JSONDecoder().decode(ErrorResponse.self, from: data) {
+                        print("❌ Server error: \(errorResponse.message)")
+                        completion(.failure(.serverError))
+                    } else {
+                        print("❌ Unexpected error")
+                        completion(.failure(.unknown))
+                    }
+                }
+            } else {
+                completion(.failure(.invalidResponse))
+            }
+        }.resume()
+    }
+}
+
+// MARK: - Reservation Methods
+extension ResyService {
+    // Remove duplicate methods - they are already declared in the main class
 }
